@@ -17,19 +17,39 @@ connectDB();
 const app = express();
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((url) => url.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like curl, mobile apps, etc.)
+    // Allow requests with no origin (like mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.replace(/\/$/, '');
+
     // Allow any localhost port
-    if (/^http:\/\/localhost(:\d+)?$/.test(origin)) {
+    if (/^http:\/\/localhost(:\d+)?$/.test(cleanOrigin)) {
       return callback(null, true);
     }
-    // Allow configured CLIENT_URL
-    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
+
+    // Automatically allow any Vercel domain (*.vercel.app)
+    if (cleanOrigin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
-    callback(new Error('Not allowed by CORS'));
+
+    // Allow configured CLIENT_URL(s)
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    // If wildcard is provided
+    if (allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+
+    callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
 }));
@@ -53,7 +73,16 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/students', studentRoutes);
 
-// ─── Health Check ────────────────────────────────────────────────────────────
+// ─── Health & Root Checks ────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CareerPath AI Backend API is running 🚀',
+    version: '1.0.0',
+    health: '/api/health',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
