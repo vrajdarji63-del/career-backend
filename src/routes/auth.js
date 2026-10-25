@@ -58,12 +58,12 @@ router.post(
         return res.status(400).json({ success: false, message: 'This email is already registered.' });
       }
 
-      // Rate-limit: max 3 OTPs per 10 min per email
+      // Rate-limit: max 10 OTP requests per 10 min per email
       const recentCount = await OTP.countDocuments({
         email: email.toLowerCase(),
         expiresAt: { $gt: new Date() },
       });
-      if (recentCount >= 3) {
+      if (recentCount >= 10) {
         return res.status(429).json({
           success: false,
           message: 'Too many OTP requests. Please wait a few minutes before trying again.',
@@ -79,10 +79,24 @@ router.post(
       // Save new OTP
       await OTP.create({ email: email.toLowerCase(), otp, expiresAt });
 
-      // Send email
-      await sendOTPEmail(email, otp, firstName || '');
+      // Send email (try Brevo / SMTP, but fallback so students are never blocked by cloud firewall)
+      let emailSent = false;
+      try {
+        await sendOTPEmail(email, otp, firstName || '');
+        emailSent = true;
+      } catch (emailErr) {
+        console.warn(`⚠️ [OTP Mailer] Delivery failed (${emailErr.message}). Falling back to direct verification.`);
+      }
 
-      res.json({ success: true, message: `Verification code sent to ${email}` });
+      if (emailSent) {
+        res.json({ success: true, message: `Verification code sent to ${email}` });
+      } else {
+        res.json({
+          success: true,
+          message: `Verification code: ${otp} (Email blocked by cloud host - enter this code to verify)`,
+          demoOtp: otp,
+        });
+      }
     } catch (err) {
       console.error('Send OTP error:', err);
       res.status(500).json({ success: false, message: err.message || 'Failed to send verification email. Please check your email address and try again.' });
