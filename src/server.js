@@ -65,13 +65,24 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+// ─── Routes (supports both /api/* and /* routes) ─────────────────────────────
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/careers', careerRoutes);
+app.use('/careers', careerRoutes);
+
 app.use('/api/skills', skillRoutes);
+app.use('/skills', skillRoutes);
+
 app.use('/api/projects', projectRoutes);
+app.use('/projects', projectRoutes);
+
 app.use('/api/assessments', assessmentRoutes);
+app.use('/assessments', assessmentRoutes);
+
 app.use('/api/students', studentRoutes);
+app.use('/students', studentRoutes);
 
 // ─── Health & Root Checks ────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -83,13 +94,15 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
+const healthHandler = (req, res) => {
   res.json({
     success: true,
     message: 'CareerPath AI API is running ✅',
     timestamp: new Date().toISOString(),
   });
-});
+};
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use('*', (req, res) => {
